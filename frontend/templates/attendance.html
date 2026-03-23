@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance - BiometricMS</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-fingerprint"></i>
+            <span>BiometricMS</span>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="/dashboard" class="nav-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+            <a href="/employees" class="nav-item"><i class="fas fa-users"></i> Employees</a>
+            <a href="/attendance" class="nav-item active"><i class="fas fa-calendar-check"></i> Attendance</a>
+            <a href="/payroll" class="nav-item"><i class="fas fa-money-bill-wave"></i> Payroll</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div id="userInfo" class="user-info"></div>
+            <button onclick="logout()" class="btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="topbar">
+            <button class="sidebar-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h2><i class="fas fa-calendar-check"></i> Attendance Management</h2>
+            <div class="topbar-right">
+                <span id="clock" class="clock"></span>
+            </div>
+        </div>
+
+        <div class="content-area">
+
+            <!-- Biometric Kiosk Panel -->
+            <div class="card" style="margin-bottom:24px">
+                <div class="card-header">
+                    <h3><i class="fas fa-fingerprint"></i> Biometric Check-in / Check-out</h3>
+                </div>
+                <div style="padding:24px">
+
+                    <!-- Controls Row -->
+                    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;align-items:flex-end">
+                        <div>
+                            <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#64748b">BIOMETRIC METHOD</label>
+                            <select id="methodSelect" class="select-input" style="min-width:200px" onchange="switchMethod()">
+                                <option value="fingerprint">🔵 Fingerprint Scanner</option>
+                                <option value="face">📷 Face Recognition</option>
+                                <option value="manual">✏️ Manual Entry</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#64748b">SELECT EMPLOYEE</label>
+                            <select id="empSelect" class="select-input" style="min-width:250px">
+                                <option value="">-- Select Employee --</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-success btn-lg" onclick="doCheckIn()">
+                            <i class="fas fa-sign-in-alt"></i> Check In
+                        </button>
+                        <button class="btn btn-danger btn-lg" onclick="doCheckOut()">
+                            <i class="fas fa-sign-out-alt"></i> Check Out
+                        </button>
+                    </div>
+
+                    <!-- Scanner + Result Row -->
+                    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+
+                        <!-- Left: Scanner/Camera -->
+                        <div style="text-align:center;min-width:220px">
+
+                            <!-- Fingerprint Scanner -->
+                            <div id="fpView">
+                                <div id="scannerRing" style="
+                                    width:140px;height:140px;border-radius:50%;
+                                    background:linear-gradient(135deg,#1e293b,#334155);
+                                    display:flex;align-items:center;justify-content:center;
+                                    margin:0 auto 12px;position:relative;overflow:hidden;
+                                    box-shadow:0 0 0 4px rgba(67,97,238,0.2),0 0 0 8px rgba(67,97,238,0.1);
+                                    transition:all 0.3s;
+                                ">
+                                    <i id="scannerIcon" class="fas fa-fingerprint"
+                                       style="font-size:56px;color:#4361ee;position:relative;z-index:2"></i>
+                                    <div id="scanLine" style="
+                                        position:absolute;left:0;right:0;height:2px;
+                                        background:rgba(67,97,238,0.8);top:-2px;display:none;
+                                    "></div>
+                                </div>
+                                <p id="scannerStatus" style="font-size:14px;font-weight:600;color:#64748b">
+                                    Ready to Scan
+                                </p>
+                            </div>
+
+                            <!-- Face Recognition Camera -->
+                            <div id="faceView" style="display:none">
+                                <div style="
+                                    position:relative;display:inline-block;
+                                    border-radius:12px;overflow:hidden;
+                                    border:3px solid #4361ee;
+                                    box-shadow:0 0 20px rgba(67,97,238,0.4);
+                                ">
+                                    <video id="webcam" width="220" height="180"
+                                           autoplay muted
+                                           style="display:block;border-radius:10px"></video>
+
+                                    <!-- Face oval guide -->
+                                    <div style="
+                                        position:absolute;inset:0;
+                                        display:flex;align-items:center;justify-content:center;
+                                        pointer-events:none;
+                                    ">
+                                        <div style="
+                                            width:100px;height:130px;
+                                            border:2px dashed rgba(76,201,240,0.9);
+                                            border-radius:50%;
+                                        "></div>
+                                    </div>
+
+                                    <!-- Scan beam -->
+                                    <div id="faceBeam" style="
+                                        position:absolute;left:0;right:0;
+                                        height:2px;background:rgba(76,201,240,0.9);
+                                        top:0;display:none;
+                                        box-shadow:0 0 8px rgba(76,201,240,0.8);
+                                    "></div>
+
+                                    <!-- Live label -->
+                                    <div style="
+                                        position:absolute;top:8px;left:8px;
+                                        background:rgba(247,37,133,0.9);
+                                        color:white;font-size:10px;font-weight:700;
+                                        padding:2px 8px;border-radius:4px;
+                                    ">● LIVE</div>
+                                </div>
+
+                                <p id="camStatus" style="
+                                    font-size:13px;font-weight:600;
+                                    color:#4361ee;margin-top:10px;
+                                ">
+                                    📷 Position face in oval
+                                </p>
+
+                                <canvas id="snapCanvas" style="display:none"></canvas>
+                            </div>
+
+                        </div>
+
+                        <!-- Right: Result Box -->
+                        <div id="bioResult" style="
+                            flex:1;min-height:180px;border-radius:12px;
+                            border:2px dashed #e2e8f0;display:flex;
+                            flex-direction:column;align-items:center;
+                            justify-content:center;padding:24px;
+                            text-align:center;min-width:250px;
+                            background:white;transition:all 0.3s;
+                        ">
+                            <i class="fas fa-hand-pointer"
+                               style="font-size:36px;color:#cbd5e1;margin-bottom:12px"></i>
+                            <p style="color:#94a3b8;font-size:14px">
+                                Select employee and click Check In or Check Out
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Records -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-list"></i> Attendance Records</h3>
+                    <div class="filter-row">
+                        <select id="monthFilter" class="select-input-sm" onchange="loadRecords()"></select>
+                        <select id="yearFilter" class="select-input-sm" onchange="loadRecords()"></select>
+                        <button class="btn btn-primary btn-sm" onclick="loadRecords()">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                        <button class="btn btn-warning btn-sm" onclick="markAbsent()">
+                            <i class="fas fa-user-times"></i> Mark Absent
+                        </button>
+                        <button class="btn btn-success btn-sm" onclick="exportCSV()">
+                            <i class="fas fa-download"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th><th>Emp ID</th><th>Name</th><th>Dept</th>
+                                <th>Check In</th><th>Check Out</th><th>Hours</th>
+                                <th>Method</th><th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attBody">
+                            <tr><td colspan="9" class="no-data">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Monthly Summary -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-bar"></i> Monthly Summary</h3>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th><th>Dept</th><th>Working Days</th>
+                                <th>Present</th><th>Half Day</th><th>Absent</th>
+                                <th>Total Hours</th><th>Attendance %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsBody">
+                            <tr><td colspan="8" class="no-data">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+    checkAuth();
+    startClock();
+
+    let employees = [];
+    let cameraStream = null;
+    let scanLineInterval = null;
+
+    const months = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+    const now = new Date();
+
+    // ── Init ──────────────────────────────────────────────────────
+    async function init() {
+        employees = await apiGet('/api/employees');
+        const sel = document.getElementById('empSelect');
+        employees.forEach(e => {
+            sel.innerHTML += `<option value="${e.emp_id}">${e.emp_id} - ${e.full_name}</option>`;
+        });
+        initFilters();
+        loadRecords();
+    }
+
+    function initFilters() {
+        const ms = document.getElementById('monthFilter');
+        const ys = document.getElementById('yearFilter');
+        months.forEach((m,i) => {
+            ms.innerHTML += `<option value="${i+1}" ${i+1===now.getMonth()+1?'selected':''}>${m}</option>`;
+        });
+        for (let y = now.getFullYear(); y >= 2020; y--) {
+            ys.innerHTML += `<option value="${y}" ${y===now.getFullYear()?'selected':''}>${y}</option>`;
+        }
+    }
+
+    // ── Switch Method ─────────────────────────────────────────────
+    function switchMethod() {
+        const method = document.getElementById('methodSelect').value;
+        if (method === 'face') {
+            document.getElementById('fpView').style.display = 'none';
+            document.getElementById('faceView').style.display = 'block';
+            startCamera();
+        } else {
+            stopCamera();
+            document.getElementById('fpView').style.display = 'block';
+            document.getElementById('faceView').style.display = 'none';
+        }
+    }
+
+    // ── Camera ────────────────────────────────────────────────────
+    async function startCamera() {
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 220, height: 180 }
+            });
+            document.getElementById('webcam').srcObject = cameraStream;
+            document.getElementById('camStatus').textContent = '📷 Position face in oval';
+        } catch(err) {
+            document.getElementById('camStatus').textContent = '❌ Camera access denied!';
+            document.getElementById('methodSelect').value = 'manual';
+            switchMethod();
+        }
+    }
+
+    function stopCamera() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = null;
+        }
+    }
+
+    function captureFrame() {
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('snapCanvas');
+        canvas.width = video.videoWidth || 220;
+        canvas.height = video.videoHeight || 180;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        return canvas.toDataURL('image/jpeg', 0.8);
+    }
+
+    // ── Face Scan Animation ───────────────────────────────────────
+    async function animateFaceScan() {
+        const beam = document.getElementById('faceBeam');
+        const status = document.getElementById('camStatus');
+        beam.style.display = 'block';
+        let pos = 0;
+        const interval = setInterval(() => {
+            pos += 3;
+            if (pos > 180) pos = 0;
+            beam.style.top = pos + 'px';
+        }, 15);
+        status.textContent = '🔵 Scanning face...';
+        await new Promise(r => setTimeout(r, 1500));
+        clearInterval(interval);
+        status.textContent = '⚙️ Matching face...';
+        await new Promise(r => setTimeout(r, 800));
+        beam.style.display = 'none';
+    }
+
+    // ── Fingerprint Animation ─────────────────────────────────────
+    async function animateFingerprint() {
+        const ring = document.getElementById('scannerRing');
+        const status = document.getElementById('scannerStatus');
+        const line = document.getElementById('scanLine');
+        ring.style.boxShadow = '0 0 0 6px rgba(67,97,238,0.6),0 0 30px rgba(67,97,238,0.4)';
+        ring.style.transform = 'scale(1.05)';
+        line.style.display = 'block';
+        status.textContent = '🔵 Scanning fingerprint...';
+        let pos = 0;
+        const interval = setInterval(() => {
+            pos += 4;
+            if (pos > 140) pos = 0;
+            line.style.top = pos + 'px';
+        }, 20);
+        await new Promise(r => setTimeout(r, 2000));
+        clearInterval(interval);
+        ring.style.boxShadow = '0 0 0 4px rgba(67,97,238,0.2)';
+        ring.style.transform = 'scale(1)';
+        line.style.display = 'none';
+        status.textContent = '✅ Scan complete!';
+        await new Promise(r => setTimeout(r, 400));
+        status.textContent = 'Ready to Scan';
+    }
+
+    // ── Check In ─────────────────────────────────────────────────
+    async function doCheckIn() {
+        const empId  = document.getElementById('empSelect').value;
+        const method = document.getElementById('methodSelect').value;
+
+        // ── REAL face recognition ─────────────────────────────
+        if (method === 'face') {
+            if (!cameraStream) {
+                alert('❌ Camera not started! Select Face Recognition method first.');
+                return;
+            }
+            await animateFaceScan();
+
+            // Capture real frame from webcam
+            const imageData = captureFrame();
+            document.getElementById('camStatus').textContent = '⚙️ Matching face in database...';
+
+            // Show spinner in result box
+            const div = document.getElementById('bioResult');
+            div.style.border     = '2px solid #4361ee';
+            div.style.background = '#eff6ff';
+            div.innerHTML = `<i class="fas fa-spinner fa-spin" style="font-size:36px;color:#4361ee;margin-bottom:10px"></i>
+                             <p style="color:#1e40af;font-weight:600">Recognizing face...</p>`;
+
+            try {
+                const res  = await fetch('/api/attendance/face-checkin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData, action: 'checkin' })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('camStatus').textContent = `✅ Welcome, ${data.employee}!`;
+                    showBioResult(true,  data.message, data.emp_id, null, false, data.employee);
+                } else {
+                    document.getElementById('camStatus').textContent = '📷 Position face in oval';
+                    showBioResult(false, data.message, null, null, false, null);
+                }
+                await loadRecords();
+            } catch(err) {
+                document.getElementById('camStatus').textContent = '📷 Position face in oval';
+                showBioResult(false, '❌ Server error! Make sure server is running.', null, null, false, null);
+            }
+            return;
+        }
+
+        // ── Fingerprint / Manual ──────────────────────────────
+        if (!empId) { alert('⚠️ Please select an employee!'); return; }
+        if (method === 'fingerprint') await animateFingerprint();
+
+        const res = await apiPost('/api/attendance/checkin', { emp_id: empId, method });
+        showBioResult(res.success, res.message, empId, null, false, null);
+        if (res.success) await loadRecords();
+    }
+
+    // ── Check Out ─────────────────────────────────────────────────
+    async function doCheckOut() {
+        const empId  = document.getElementById('empSelect').value;
+        const method = document.getElementById('methodSelect').value;
+
+        // ── REAL face recognition ─────────────────────────────
+        if (method === 'face') {
+            if (!cameraStream) {
+                alert('❌ Camera not started! Select Face Recognition method first.');
+                return;
+            }
+            await animateFaceScan();
+
+            const imageData = captureFrame();
+            document.getElementById('camStatus').textContent = '⚙️ Matching face in database...';
+
+            const div = document.getElementById('bioResult');
+            div.style.border     = '2px solid #4361ee';
+            div.style.background = '#eff6ff';
+            div.innerHTML = `<i class="fas fa-spinner fa-spin" style="font-size:36px;color:#4361ee;margin-bottom:10px"></i>
+                             <p style="color:#1e40af;font-weight:600">Recognizing face...</p>`;
+
+            try {
+                const res  = await fetch('/api/attendance/face-checkin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData, action: 'checkout' })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('camStatus').textContent = `✅ Goodbye, ${data.employee}!`;
+                    showBioResult(true,  data.message, data.emp_id, data.hours_worked, true, data.employee);
+                } else {
+                    document.getElementById('camStatus').textContent = '📷 Position face in oval';
+                    showBioResult(false, data.message, null, null, true, null);
+                }
+                await loadRecords();
+            } catch(err) {
+                document.getElementById('camStatus').textContent = '📷 Position face in oval';
+                showBioResult(false, '❌ Server error! Make sure server is running.', null, null, true, null);
+            }
+            return;
+        }
+
+        // ── Fingerprint / Manual ──────────────────────────────
+        if (!empId) { alert('⚠️ Please select an employee!'); return; }
+        if (method === 'fingerprint') await animateFingerprint();
+
+        const res = await apiPost('/api/attendance/checkout', { emp_id: empId, method });
+        showBioResult(res.success, res.message, empId, res.hours_worked, true, null);
+        if (res.success) await loadRecords();
+    }
+
+    // ── Show Result ───────────────────────────────────────────────
+    function showBioResult(success, msg, empId, hours, isCheckout, empName) {
+        const emp  = empId ? employees.find(e => e.emp_id === empId) : null;
+        const name = empName || (emp ? emp.full_name : '');
+        const div  = document.getElementById('bioResult');
+        div.style.border     = `2px solid ${success ? '#22c55e' : '#f72585'}`;
+        div.style.background = success ? '#f0fdf4' : '#fff1f2';
+        const title = success ? (isCheckout ? '✅ Checked Out!' : '✅ Checked In!') : '❌ Error';
+        div.innerHTML = `
+            <i class="fas ${success ? 'fa-check-circle' : 'fa-times-circle'}"
+               style="font-size:48px;color:${success ? '#22c55e' : '#f72585'};margin-bottom:12px"></i>
+            <h4 style="font-size:20px;margin-bottom:8px;color:${success ? '#15803d' : '#be123c'}">${title}</h4>
+            <p style="color:${success ? '#166534' : '#991b1b'};margin-bottom:6px">${msg}</p>
+            ${name  ? `<p style="font-weight:700;color:#1e293b;margin-top:4px;font-size:16px">👤 ${name}</p>` : ''}
+            ${hours ? `<p style="color:#64748b;margin-top:6px">⏱️ Hours Worked: <strong>${hours}h</strong></p>` : ''}
+        `;
+        setTimeout(() => {
+            div.style.border     = '2px dashed #e2e8f0';
+            div.style.background = 'white';
+            div.innerHTML = `
+                <i class="fas fa-hand-pointer" style="font-size:36px;color:#cbd5e1;margin-bottom:12px"></i>
+                <p style="color:#94a3b8;font-size:14px">Select employee and click Check In or Check Out</p>`;
+        }, 6000);
+    }
+
+    // ── Load Records ──────────────────────────────────────────────
+    async function loadRecords() {
+        const month = document.getElementById('monthFilter').value;
+        const year = document.getElementById('yearFilter').value;
+        document.getElementById('attBody').innerHTML =
+            '<tr><td colspan="9" class="no-data"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+        const [records, stats] = await Promise.all([
+            apiGet(`/api/attendance?month=${month}&year=${year}`),
+            apiGet(`/api/attendance/stats?month=${month}&year=${year}`)
+        ]);
+        renderRecords(records);
+        renderStats(stats);
+    }
+
+    function renderRecords(records) {
+        const tbody = document.getElementById('attBody');
+        if (!records.length) {
+            tbody.innerHTML = '<tr><td colspan="9" class="no-data">No records found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = records.map(r => `
+            <tr>
+                <td>${r.att_date}</td>
+                <td><span class="badge">${r.emp_id}</span></td>
+                <td>${r.full_name}</td>
+                <td>${r.department}</td>
+                <td class="time-cell">${r.check_in || '--'}</td>
+                <td class="time-cell">${r.check_out || '--'}</td>
+                <td>${r.hours_worked || '--'}</td>
+                <td><span class="method-badge ${r.method}">${r.method}</span></td>
+                <td><span class="status-badge ${r.status}">${r.status}</span></td>
+            </tr>
+        `).join('');
+    }
+
+    function renderStats(stats) {
+        const tbody = document.getElementById('statsBody');
+        if (!stats.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="no-data">No data</td></tr>';
+            return;
+        }
+        tbody.innerHTML = stats.map(s => {
+            const present = s.present_days || 0;
+            const pct = s.working_days ? Math.round((present/s.working_days)*100) : 0;
+            return `<tr>
+                <td><strong>${s.full_name}</strong></td>
+                <td>${s.department}</td>
+                <td>${s.working_days}</td>
+                <td class="text-green">${present}</td>
+                <td class="text-orange">${s.half_days || 0}</td>
+                <td class="text-red">${s.absent_days || 0}</td>
+                <td>${s.total_hours || 0}</td>
+                <td>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width:${pct}%"></div>
+                    </div>
+                    <small>${pct}%</small>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ── Mark Absent ───────────────────────────────────────────────
+    async function markAbsent() {
+        if (!confirm('Mark all employees who have NOT checked in today as ABSENT?')) return;
+        const res = await apiPost('/api/attendance/mark-absent', {});
+        if (res.success) {
+            alert(`✅ Done!\nPresent: ${res.present_count}\nAbsent: ${res.absent_count}`);
+            loadRecords();
+        }
+    }
+
+    // ── Export CSV ────────────────────────────────────────────────
+    function exportCSV() {
+        const rows = [];
+        document.querySelectorAll('#attBody tr').forEach(tr => {
+            const cells = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+            if (cells.length > 1) rows.push(cells.join(','));
+        });
+        if (!rows.length) { alert('No data to export!'); return; }
+        const csv = 'Date,Emp ID,Name,Dept,Check In,Check Out,Hours,Method,Status\n' + rows.join('\n');
+        const a = document.createElement('a');
+        a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+        a.download = `attendance_${Date.now()}.csv`;
+        a.click();
+    }
+
+    // ── Start ─────────────────────────────────────────────────────
+    init();
+</script>
+</body>
+</html>

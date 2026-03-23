@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employees - BiometricMS</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar">
+        <div class="sidebar-header"><i class="fas fa-fingerprint"></i><span>BiometricMS</span></div>
+        <nav class="sidebar-nav">
+            <a href="/dashboard" class="nav-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+            <a href="/employees" class="nav-item active"><i class="fas fa-users"></i> Employees</a>
+            <a href="/attendance" class="nav-item"><i class="fas fa-calendar-check"></i> Attendance</a>
+            <a href="/payroll" class="nav-item"><i class="fas fa-money-bill-wave"></i> Payroll</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div id="userInfo" class="user-info"></div>
+            <button onclick="logout()" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </div>
+    </aside>
+    <main class="main-content">
+        <div class="topbar">
+            <button class="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+            <h2><i class="fas fa-users"></i> Employee Management</h2>
+        </div>
+        <div class="content-area">
+            <div class="card">
+                <div class="card-header">
+                    <h3>All Employees</h3>
+                    <div class="header-actions">
+                        <input type="text" id="searchInp" placeholder="Search employees..." class="search-input" oninput="filterEmployees()">
+                        <button class="btn btn-primary" onclick="openModal()"><i class="fas fa-plus"></i> Add Employee</button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Emp ID</th><th>Name</th><th>Department</th><th>Designation</th>
+                                <th>Email</th><th>Phone</th><th>Salary (₹)</th><th>Biometric</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody id="empBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="empModal" class="modal" style="display:none">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Add Employee</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="empForm">
+            <div class="form-grid">
+                <div class="form-group"><label>Employee ID *</label><input type="text" id="fEmpId" required></div>
+                <div class="form-group"><label>Full Name *</label><input type="text" id="fName" required></div>
+                <div class="form-group"><label>Department</label>
+                    <select id="fDept">
+                        <option>Computer Science</option><option>Mathematics</option><option>Physics</option>
+                        <option>Chemistry</option><option>Electronics</option><option>Administration</option>
+                        <option>Library</option><option>Sports</option><option>Other</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Designation</label><input type="text" id="fDesig"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="fEmail"></div>
+                <div class="form-group"><label>Phone</label><input type="text" id="fPhone"></div>
+                <div class="form-group"><label>Monthly Salary (₹)</label><input type="number" id="fSalary" step="0.01"></div>
+                <div class="form-group"><label>Join Date</label><input type="date" id="fJoinDate"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Employee</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Biometric Enroll Modal -->
+<div id="bioModal" class="modal" style="display:none">
+    <div class="modal-content modal-sm">
+        <div class="modal-header">
+            <h3><i class="fas fa-fingerprint"></i> Enroll Biometric</h3>
+            <button class="modal-close" onclick="closeBioModal()">&times;</button>
+        </div>
+        <div style="padding:20px">
+
+            <p id="bioEmpName" style="text-align:center;font-weight:700;font-size:15px;color:#1e293b;margin-bottom:16px"></p>
+
+            <!-- Status message -->
+            <div id="bioMsg" style="display:none;padding:12px;border-radius:8px;margin-bottom:14px;text-align:center;font-weight:600;font-size:14px"></div>
+
+            <!-- Buttons -->
+            <div id="bioOptions">
+                <button onclick="simulateEnroll('fingerprint')" style="
+                    width:100%;padding:14px;margin-bottom:10px;
+                    background:linear-gradient(135deg,#4361ee,#3a0ca3);
+                    color:white;border:none;border-radius:10px;
+                    font-size:14px;font-weight:600;cursor:pointer;
+                    display:flex;align-items:center;gap:10px;justify-content:center;">
+                    <i class="fas fa-fingerprint" style="font-size:18px"></i>
+                    Enroll Fingerprint (Simulation)
+                    <span id="fpStatus" style="margin-left:auto;font-size:16px"></span>
+                </button>
+
+                <button onclick="startFaceEnroll()" style="
+                    width:100%;padding:14px;
+                    background:linear-gradient(135deg,#7209b7,#4cc9f0);
+                    color:white;border:none;border-radius:10px;
+                    font-size:14px;font-weight:600;cursor:pointer;
+                    display:flex;align-items:center;gap:10px;justify-content:center;">
+                    <i class="fas fa-camera" style="font-size:18px"></i>
+                    Enroll Face — Live Camera
+                    <span id="faceStatus" style="margin-left:auto;font-size:16px"></span>
+                </button>
+            </div>
+
+            <!-- Camera box (shown only after "Enroll Face" clicked) -->
+            <div id="cameraBox" style="display:none;margin-top:16px;text-align:center">
+                <div style="
+                    position:relative;display:inline-block;
+                    border-radius:12px;overflow:hidden;
+                    border:3px solid #7209b7;
+                    box-shadow:0 0 20px rgba(114,9,183,0.3);">
+                    <video id="enrollCam" width="300" height="225" autoplay muted style="display:block"></video>
+                    <!-- Oval guide -->
+                    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+                        <div style="width:120px;height:155px;border:2px dashed rgba(76,201,240,0.9);border-radius:50%"></div>
+                    </div>
+                    <!-- Scan beam -->
+                    <div id="enrollBeam" style="position:absolute;left:0;right:0;height:2px;background:rgba(114,9,183,0.9);top:0;display:none;box-shadow:0 0 8px rgba(114,9,183,0.8)"></div>
+                    <!-- LIVE badge -->
+                    <div style="position:absolute;top:8px;left:8px;background:rgba(247,37,133,0.9);color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">● LIVE</div>
+                </div>
+                <p id="camEnrollMsg" style="margin-top:10px;font-weight:600;color:#7209b7;font-size:13px">
+                    📷 Align your face in the oval, then click Capture
+                </p>
+                <div style="display:flex;gap:10px;justify-content:center;margin-top:12px">
+                    <button onclick="captureFace()" style="
+                        background:linear-gradient(135deg,#7209b7,#4cc9f0);
+                        color:white;padding:10px 24px;border:none;
+                        border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">
+                        <i class="fas fa-camera"></i> Capture Face
+                    </button>
+                    <button onclick="cancelFaceEnroll()" style="
+                        background:#64748b;color:white;padding:10px 16px;
+                        border:none;border-radius:8px;font-size:13px;cursor:pointer;">
+                        Cancel
+                    </button>
+                </div>
+                <canvas id="enrollCanvas" style="display:none"></canvas>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+    checkAuth();
+
+    let employees    = [];
+    let editMode     = false;
+    let currentEmpId = null;
+    let bioEmpId     = null;
+    let enrollStream = null;
+
+    // ── Load Employees ─────────────────────────────────────────────
+    async function loadEmployees() {
+        employees = await apiGet('/api/employees');
+        renderEmployees(employees);
+    }
+
+    function renderEmployees(list) {
+        const tbody = document.getElementById('empBody');
+        if (!list || !list.length) {
+            tbody.innerHTML = '<tr><td colspan="9" class="no-data">No employees found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = list.map(e => `
+            <tr>
+                <td><span class="badge">${e.emp_id}</span></td>
+                <td><strong>${e.full_name}</strong></td>
+                <td>${e.department || '--'}</td>
+                <td>${e.designation || '--'}</td>
+                <td>${e.email || '--'}</td>
+                <td>${e.phone || '--'}</td>
+                <td>₹${Number(e.salary).toLocaleString('en-IN')}</td>
+                <td>
+                    ${e.fingerprint_hash ? '<span class="method-badge fingerprint">FP ✓</span>' : ''}
+                    ${e.face_encoding === 'enrolled' ? '<span class="method-badge face">Face ✓</span>' : ''}
+                    ${!e.fingerprint_hash && e.face_encoding !== 'enrolled' ? '<span class="method-badge">None</span>' : ''}
+                </td>
+                <td class="action-btns">
+                    <button class="btn btn-sm btn-info" onclick="openBioModal('${e.emp_id}','${e.full_name.replace(/'/g,"\\'")}')">
+                        <i class="fas fa-fingerprint"></i>
+                    </button>
+                    <button class="btn btn-sm btn-warning" onclick="editEmployee('${e.emp_id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${e.emp_id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function filterEmployees() {
+        const q = document.getElementById('searchInp').value.toLowerCase();
+        renderEmployees(employees.filter(e =>
+            e.full_name.toLowerCase().includes(q) ||
+            e.emp_id.toLowerCase().includes(q) ||
+            (e.department || '').toLowerCase().includes(q)
+        ));
+    }
+
+    // ── Add / Edit Modal ───────────────────────────────────────────
+    function openModal(emp = null) {
+        editMode = !!emp;
+        document.getElementById('modalTitle').textContent = editMode ? 'Edit Employee' : 'Add Employee';
+        document.getElementById('fEmpId').disabled = editMode;
+        if (emp) {
+            document.getElementById('fEmpId').value    = emp.emp_id;
+            document.getElementById('fName').value     = emp.full_name;
+            document.getElementById('fDept').value     = emp.department;
+            document.getElementById('fDesig').value    = emp.designation;
+            document.getElementById('fEmail').value    = emp.email;
+            document.getElementById('fPhone').value    = emp.phone;
+            document.getElementById('fSalary').value   = emp.salary;
+            document.getElementById('fJoinDate').value = emp.join_date;
+            currentEmpId = emp.emp_id;
+        } else {
+            document.getElementById('empForm').reset();
+            currentEmpId = null;
+        }
+        document.getElementById('empModal').style.display = 'flex';
+    }
+
+    function closeModal() { document.getElementById('empModal').style.display = 'none'; }
+    function editEmployee(id) { openModal(employees.find(e => e.emp_id === id)); }
+
+    async function deleteEmployee(empId) {
+        const emp  = employees.find(e => e.emp_id === empId);
+        const name = emp ? emp.full_name : empId;
+        if (!confirm(`Are you sure you want to delete?\n\nEmployee: ${name}\nID: ${empId}`)) return;
+        try {
+            await apiDelete(`/api/employees/${empId}`);
+            employees = employees.filter(e => e.emp_id !== empId);
+            renderEmployees(employees);
+            showToast(`✅ ${name} deleted successfully!`, 'success');
+        } catch { showToast('❌ Error deleting employee. Try again.', 'error'); }
+    }
+
+    function showToast(message, type) {
+        const existing = document.getElementById('toast');
+        if (existing) existing.remove();
+        const toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.style.cssText = `
+            position:fixed;top:20px;right:20px;z-index:9999;
+            padding:16px 24px;border-radius:12px;font-size:15px;font-weight:600;
+            box-shadow:0 8px 24px rgba(0,0,0,0.2);
+            background:${type === 'success' ? '#22c55e' : '#f72585'};color:white;max-width:400px;`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => { if (toast) toast.remove(); }, 3000);
+    }
+
+    document.getElementById('empForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            emp_id:      document.getElementById('fEmpId').value,
+            full_name:   document.getElementById('fName').value,
+            department:  document.getElementById('fDept').value,
+            designation: document.getElementById('fDesig').value,
+            email:       document.getElementById('fEmail').value,
+            phone:       document.getElementById('fPhone').value,
+            salary:      document.getElementById('fSalary').value,
+            join_date:   document.getElementById('fJoinDate').value,
+        };
+        if (editMode) await apiPut(`/api/employees/${currentEmpId}`, payload);
+        else          await apiPost('/api/employees', payload);
+        closeModal();
+        await loadEmployees();
+        showToast('✅ Employee saved successfully!', 'success');
+    });
+
+    // ── Biometric Modal ────────────────────────────────────────────
+    function openBioModal(empId, empName) {
+        bioEmpId = empId;
+        document.getElementById('bioEmpName').textContent         = `👤 ${empName}  (${empId})`;
+        document.getElementById('bioMsg').style.display           = 'none';
+        document.getElementById('bioOptions').style.display       = 'block';
+        document.getElementById('cameraBox').style.display        = 'none';
+        document.getElementById('bioModal').style.display         = 'flex';
+
+        const emp = employees.find(e => e.emp_id === empId);
+        if (emp) {
+            document.getElementById('fpStatus').textContent   = emp.fingerprint_hash            ? '✅' : '❌';
+            document.getElementById('faceStatus').textContent = emp.face_encoding === 'enrolled' ? '✅' : '❌';
+        }
+    }
+
+    function closeBioModal() {
+        cancelFaceEnroll();
+        document.getElementById('bioModal').style.display = 'none';
+    }
+
+    // ── Fingerprint simulation ─────────────────────────────────────
+    async function simulateEnroll(type) {
+        const msg = document.getElementById('bioMsg');
+        msg.style.display    = 'block';
+        msg.style.background = '#dbeafe';
+        msg.style.color      = '#1e40af';
+        msg.textContent      = '🔵 Place finger on scanner...';
+        await new Promise(r => setTimeout(r, 1000));
+        msg.textContent = '⚙️ Reading fingerprint...';
+        await new Promise(r => setTimeout(r, 1500));
+
+        try {
+            const res  = await fetch(`/api/employees/${bioEmpId}/enroll`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, data: `${type}_${bioEmpId}_${Date.now()}` })
+            });
+            const data = await res.json();
+            if (data.success) {
+                msg.style.background = '#d1fae5';
+                msg.style.color      = '#065f46';
+                msg.textContent      = '✅ Fingerprint enrolled!';
+                document.getElementById('fpStatus').textContent = '✅';
+                const emp = employees.find(e => e.emp_id === bioEmpId);
+                if (emp) emp.fingerprint_hash = 'enrolled';
+                renderEmployees(employees);
+            } else {
+                msg.style.background = '#fee2e2';
+                msg.style.color      = '#991b1b';
+                msg.textContent      = '❌ Failed. Try again.';
+            }
+        } catch {
+            msg.style.background = '#fee2e2';
+            msg.style.color      = '#991b1b';
+            msg.textContent      = '❌ Server error.';
+        }
+    }
+
+    // ── REAL Face Enroll — opens live camera ───────────────────────
+    async function startFaceEnroll() {
+        document.getElementById('bioOptions').style.display = 'none';
+        document.getElementById('cameraBox').style.display  = 'block';
+        document.getElementById('bioMsg').style.display     = 'none';
+        try {
+            enrollStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 300, height: 225, facingMode: 'user' }
+            });
+            document.getElementById('enrollCam').srcObject = enrollStream;
+            document.getElementById('camEnrollMsg').textContent = '📷 Align face in oval then click Capture';
+        } catch {
+            document.getElementById('camEnrollMsg').textContent = '❌ Camera denied! Allow camera permission.';
+        }
+    }
+
+    function cancelFaceEnroll() {
+        if (enrollStream) {
+            enrollStream.getTracks().forEach(t => t.stop());
+            enrollStream = null;
+        }
+        document.getElementById('cameraBox').style.display  = 'none';
+        document.getElementById('bioOptions').style.display = 'block';
+    }
+
+    async function captureFace() {
+        const statusEl = document.getElementById('camEnrollMsg');
+        const beam     = document.getElementById('enrollBeam');
+
+        // Scan beam animation
+        beam.style.display = 'block';
+        let pos = 0;
+        const iv = setInterval(() => { pos = (pos + 3) % 225; beam.style.top = pos + 'px'; }, 15);
+        statusEl.textContent = '⚙️ Capturing face...';
+        await new Promise(r => setTimeout(r, 1500));
+        clearInterval(iv);
+        beam.style.display   = 'none';
+        statusEl.textContent = '🔄 Sending to server...';
+
+        // Capture real frame from webcam
+        const video  = document.getElementById('enrollCam');
+        const canvas = document.getElementById('enrollCanvas');
+        canvas.width  = video.videoWidth  || 300;
+        canvas.height = video.videoHeight || 225;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const imgData = canvas.toDataURL('image/jpeg', 0.92);
+
+        // POST to backend → saves face to DB
+        try {
+            const res  = await fetch(`/api/employees/${bioEmpId}/enroll-face`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emp_id: bioEmpId, image: imgData })
+            });
+            const data = await res.json();
+
+            cancelFaceEnroll();
+            const msg = document.getElementById('bioMsg');
+            msg.style.display = 'block';
+
+            if (data.success) {
+                msg.style.background = '#d1fae5';
+                msg.style.color      = '#065f46';
+                msg.textContent      = '✅ Face enrolled successfully!';
+                document.getElementById('faceStatus').textContent = '✅';
+                const emp = employees.find(e => e.emp_id === bioEmpId);
+                if (emp) emp.face_encoding = 'enrolled';
+                renderEmployees(employees);
+            } else {
+                msg.style.background = '#fee2e2';
+                msg.style.color      = '#991b1b';
+                msg.textContent      = `❌ ${data.message}`;
+            }
+        } catch {
+            statusEl.textContent = '❌ Server error! Try again.';
+        }
+    }
+
+    loadEmployees();
+</script>
+
+    async function loadEmployees() {
+        employees = await apiGet('/api/employees');
+        renderEmployees(employees);
+    }
+
+    function renderEmployees(list) {
+        const tbody = document.getElementById('empBody');
+        if (!list.length) {
+            tbody.innerHTML = '<tr><td colspan="9" class="no-data">No employees found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = list.map(e => `
+            <tr>
+                <td><span class="badge">${e.emp_id}</span></td>
+                <td><strong>${e.full_name}</strong></td>
+                <td>${e.department || '--'}</td>
+                <td>${e.designation || '--'}</td>
+                <td>${e.email || '--'}</td>
+                <td>${e.phone || '--'}</td>
+                <td>₹${Number(e.salary).toLocaleString('en-IN')}</td>
+                <td>
+                    ${e.fingerprint_hash ? '<span class="method-badge fingerprint">FP ✓</span>' : ''}
+                    ${e.face_encoding ? '<span class="method-badge face">Face ✓</span>' : ''}
+                    ${!e.fingerprint_hash && !e.face_encoding ? '<span class="method-badge">None</span>' : ''}
+                </td>
+                <td class="action-btns">
+                    <button class="btn btn-sm btn-info" onclick="openBioModal('${e.emp_id}','${e.full_name}')"><i class="fas fa-fingerprint"></i></button>
+                    <button class="btn btn-sm btn-warning" onclick="editEmployee('${e.emp_id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${e.emp_id}')"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function filterEmployees() {
+        const q = document.getElementById('searchInp').value.toLowerCase();
+        renderEmployees(employees.filter(e =>
+            e.full_name.toLowerCase().includes(q) || e.emp_id.toLowerCase().includes(q) ||
+            (e.department || '').toLowerCase().includes(q)
+        ));
+    }
+
+    function openModal(emp=null) {
+        editMode = !!emp;
+        document.getElementById('modalTitle').textContent = editMode ? 'Edit Employee' : 'Add Employee';
+        document.getElementById('fEmpId').disabled = editMode;
+        if (emp) {
+            document.getElementById('fEmpId').value = emp.emp_id;
+            document.getElementById('fName').value = emp.full_name;
+            document.getElementById('fDept').value = emp.department;
+            document.getElementById('fDesig').value = emp.designation;
+            document.getElementById('fEmail').value = emp.email;
+            document.getElementById('fPhone').value = emp.phone;
+            document.getElementById('fSalary').value = emp.salary;
+            document.getElementById('fJoinDate').value = emp.join_date;
+            currentEmpId = emp.emp_id;
+        } else {
+            document.getElementById('empForm').reset();
+            currentEmpId = null;
+        }
+        document.getElementById('empModal').style.display = 'flex';
+    }
+
+    function closeModal() { document.getElementById('empModal').style.display = 'none'; }
+
+    function editEmployee(empId) { openModal(employees.find(e => e.emp_id === empId)); }
+
+    async function deleteEmployee(empId) {
+    const emp = employees.find(e => e.emp_id === empId);
+    const name = emp ? emp.full_name : empId;
+    
+    if (!confirm(`Are you sure you want to delete?\n\nEmployee: ${name}\nID: ${empId}`)) return;
+    
+    try {
+        await apiDelete(`/api/employees/${empId}`);
+        
+        // Remove from local array immediately
+        employees = employees.filter(e => e.emp_id !== empId);
+        
+        // Re-render table
+        renderEmployees(employees);
+        
+        // Show green success toast
+        showToast(`✅ ${name} deleted successfully!`, 'success');
+
+    } catch(err) {
+        showToast('❌ Error deleting employee. Try again.', 'error');
+    }
+}
+
+function showToast(message, type) {
+    // Remove existing toast
+    const existing = document.getElementById('toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.style.cssText = `
+        position:fixed;
+        top:20px;
+        right:20px;
+        z-index:9999;
+        padding:16px 24px;
+        border-radius:12px;
+        font-size:15px;
+        font-weight:600;
+        box-shadow:0 8px 24px rgba(0,0,0,0.2);
+        display:flex;
+        align-items:center;
+        gap:10px;
+        animation:slideIn 0.3s ease;
+        background:${type === 'success' ? '#22c55e' : '#f72585'};
+        color:white;
+        max-width:400px;
+    `;
+    toast.innerHTML = message;
+    document.body.appendChild(toast);
+
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100px); opacity: 0; }
+            to   { transform: translateX(0);     opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (toast) toast.remove();
+    }, 3000);
+}
+
+    document.getElementById('empForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            emp_id: document.getElementById('fEmpId').value,
+            full_name: document.getElementById('fName').value,
+            department: document.getElementById('fDept').value,
+            designation: document.getElementById('fDesig').value,
+            email: document.getElementById('fEmail').value,
+            phone: document.getElementById('fPhone').value,
+            salary: document.getElementById('fSalary').value,
+            join_date: document.getElementById('fJoinDate').value,
+        };
+        if (editMode) {
+            await apiPut(`/api/employees/${currentEmpId}`, payload);
+        } else {
+            await apiPost('/api/employees', payload);
+        }
+        closeModal();
+        await loadEmployees();
+        showToast(`✅ Employee saved successfully!`, 'success');
+    });
+    let bioEmpId = null;
+    function openBioModal(empId, empName) {
+        bioEmpId = empId;
+        document.getElementById('bioEmpName').textContent = `Employee: ${empName} (${empId})`;
+        document.getElementById('bioMsg').textContent = '';
+        document.getElementById('bioModal').style.display = 'flex';
+    }
+
+    async function simulateEnroll(type) {
+    const msgEl = document.getElementById('bioMsg');
+    msgEl.textContent = `Scanning ${type}... Please wait...`;
+    msgEl.className = 'bio-msg info';
+    msgEl.style.display = 'block';
+
+    await new Promise(r => setTimeout(r, 2000));
+
+    const bioData = `${type.toUpperCase()}_${bioEmpId}_${Date.now()}`;
+
+    try {
+        const res = await apiPost(`/api/employees/${bioEmpId}/enroll`, { type, data: bioData });
+
+        if (res.success) {
+            msgEl.textContent = `✅ ${res.message}`;
+            msgEl.className = 'bio-msg success';
+
+            // Update employee in local array immediately
+            const emp = employees.find(e => e.emp_id === bioEmpId);
+            if (emp) {
+                if (type === 'fingerprint') {
+                    emp.fingerprint_hash = 'enrolled';
+                } else {
+                    emp.face_encoding = 'enrolled';
+                }
+            }
+
+            // Re-render table immediately
+            renderEmployees(employees);
+
+            // Close modal and reload from DB after 2 seconds
+            setTimeout(async () => {
+                document.getElementById('bioModal').style.display = 'none';
+                await loadEmployees(); // Fresh reload from database
+            }, 2000);
+
+        } else {
+            msgEl.textContent = '❌ Enrollment failed. Try again.';
+            msgEl.className = 'bio-msg error';
+        }
+
+    } catch(err) {
+        msgEl.textContent = '❌ Server error. Try again.';
+        msgEl.className = 'bio-msg error';
+    }
+}
+    loadEmployees();
+</script>
+</body>
+</html>

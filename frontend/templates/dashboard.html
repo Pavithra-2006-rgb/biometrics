@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - BiometricMS</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-fingerprint"></i>
+                <span>BiometricMS</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item active"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="/employees" class="nav-item"><i class="fas fa-users"></i> Employees</a>
+                <a href="/attendance" class="nav-item"><i class="fas fa-calendar-check"></i> Attendance</a>
+                <a href="/payroll" class="nav-item"><i class="fas fa-money-bill-wave"></i> Payroll</a>
+            </nav>
+            <div class="sidebar-footer">
+                <div id="userInfo" class="user-info"></div>
+                <button onclick="logout()" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="topbar">
+                <button class="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h2><i class="fas fa-tachometer-alt"></i> Dashboard</h2>
+                <div class="topbar-right">
+                    <span id="clock" class="clock"></span>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card blue">
+                        <div class="stat-icon"><i class="fas fa-users"></i></div>
+                        <div class="stat-info">
+                            <h3 id="totalEmp">--</h3>
+                            <p>Total Employees</p>
+                        </div>
+                    </div>
+                    <div class="stat-card green">
+                        <div class="stat-icon"><i class="fas fa-user-check"></i></div>
+                        <div class="stat-info">
+                            <h3 id="presentToday">--</h3>
+                            <p>Present Today</p>
+                        </div>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="stat-icon"><i class="fas fa-user-times"></i></div>
+                        <div class="stat-info">
+                            <h3 id="absentToday">--</h3>
+                            <p>Absent Today</p>
+                        </div>
+                    </div>
+                    <div class="stat-card purple">
+                        <div class="stat-icon"><i class="fas fa-rupee-sign"></i></div>
+                        <div class="stat-info">
+                            <h3 id="totalPayroll">--</h3>
+                            <p>Monthly Payroll</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="charts-row">
+                    <div class="card chart-card">
+                        <div class="card-header"><h3>Department Strength</h3></div>
+                        <canvas id="deptChart" height="250"></canvas>
+                    </div>
+                    <div class="card chart-card">
+                        <div class="card-header"><h3>Today's Attendance</h3></div>
+                        <canvas id="attChart" height="250"></canvas>
+                    </div>
+                </div>
+
+                <!-- Today's Attendance Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-clock"></i> Today's Check-ins</h3>
+                        
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table" id="todayTable">
+                            <thead>
+                                <tr>
+                                    <th>Emp ID</th><th>Name</th><th>Department</th>
+                                    <th>Check In</th><th>Check Out</th><th>Hours</th><th>Method</th><th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="todayBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+        checkAuth();
+        loadDashboard();
+        loadTodayAttendance();
+        startClock();
+
+        async function loadDashboard() {
+            const data = await apiGet('/api/dashboard/stats');
+            document.getElementById('totalEmp').textContent = data.total_employees;
+            document.getElementById('presentToday').textContent = data.present_today;
+            document.getElementById('absentToday').textContent = data.absent_today;
+            document.getElementById('totalPayroll').textContent = '₹' + (data.total_payroll || 0).toLocaleString('en-IN', {maximumFractionDigits:0});
+
+            // Dept Chart
+            const deptCtx = document.getElementById('deptChart').getContext('2d');
+            new Chart(deptCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.dept_stats.map(d => d.department),
+                    datasets: [{ label: 'Employees', data: data.dept_stats.map(d => d.count),
+                        backgroundColor: ['#4361ee','#3f37c9','#4895ef','#4cc9f0','#f72585','#7209b7','#3a0ca3','#480ca8'] }]
+                },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+
+            // Att Chart
+            const attCtx = document.getElementById('attChart').getContext('2d');
+            new Chart(attCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Present', 'Absent'],
+                    datasets: [{ data: [data.present_today, data.absent_today],
+                        backgroundColor: ['#4cc9f0', '#f72585'] }]
+                },
+                options: { plugins: { legend: { position: 'bottom' } } }
+            });
+        }
+
+        async function loadTodayAttendance() {
+            const records = await apiGet('/api/attendance/today');
+            const tbody = document.getElementById('todayBody');
+            if (!records.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="no-data">No attendance records today</td></tr>';
+                return;
+            }
+            tbody.innerHTML = records.map(r => `
+                <tr>
+                    <td><span class="badge">${r.emp_id}</span></td>
+                    <td>${r.full_name}</td>
+                    <td>${r.department}</td>
+                    <td class="time-cell">${r.check_in || '--'}</td>
+                    <td class="time-cell">${r.check_out || '--'}</td>
+                    <td>${r.hours_worked || '--'}</td>
+                    <td><span class="method-badge ${r.method}">${r.method}</span></td>
+                    <td><span class="status-badge ${r.status}">${r.status}</span></td>
+                </tr>
+            `).join('');
+        }
+        
+    </script>
+</body>
+</html>
