@@ -28,11 +28,11 @@ CORS(app)
 # ─── DB Config ────────────────────────────────────────────────────────────────
 def get_db():
     return mysql.connector.connect(
-        host=os.getenv('DB_HOST', 'localhost'),
-        user=os.getenv('DB_USER', 'root'),
-        password=os.getenv('DB_PASSWORD', 'pavi@2006'),
-        database=os.getenv('DB_NAME', 'biometric_attendance'),
-        port=int(os.getenv('DB_PORT', 3306))
+        host=os.getenv('mysql-17adef02-murthypavithra4-d71e.c.aivencloud.com'),
+        user=os.getenv('avnadmin'),
+        password=os.getenv('AVNS_vjItCpIAk424-h4lQlX'),
+        database=os.getenv('biometric_attendance'),
+        port=int(os.getenv('25604'))
     )
 
 # ─── Routes: Pages ────────────────────────────────────────────────────────────
